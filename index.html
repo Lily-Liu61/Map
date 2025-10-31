@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Earthquake Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+
+        #side-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 400px;
+            max-height: 80%;
+            background-color: rgba(255, 255, 255, 0.95);
+            overflow-y: auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        @media (max-width: 1024px) {
+            #side-panel {
+                display: none;
+            }
+        }
+
+        /* 表格样式 */
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 8px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        button {
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="map"></div>
+
+
+    <div id="side-panel">
+        <h2>Earthquake List</h2>
+        <button onclick="sortTable()">Sort by Magnitude</button>
+        <table>
+            <tr>
+                <th>id</th>
+                <th>magnitude</th>
+                <th>timestamp</th>
+            </tr>
+        </table>
+    </div>
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoibGlseS02MSIsImEiOiJjbWhlYXNnZXQwYnBmMm1vZXdremVqOWYxIn0.N5jV7WMsuC_28bUwXqxbUg';
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [105, 35],
+            zoom: 3
+        });
+
+        async function geojsonFetch() {
+
+            let response = await fetch('./assets/earthquakes.geojson');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            let earthquakes = await response.json();
+
+
+            response = await fetch('./assets/China.json');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            let China = await response.json();
+
+
+            const table = document.querySelector("table");
+            earthquakes.features.forEach(eq => {
+                const row = table.insertRow(-1);
+                row.insertCell(0).textContent = eq.properties.id;
+                row.insertCell(1).textContent = eq.properties.mag;
+                row.insertCell(2).textContent = eq.properties.time; // 原始时间或 duration
+            });
+
+
+            map.on('load', () => {
+
+                map.addSource('earthquakes', { type: 'geojson', data: earthquakes });
+                map.addLayer({
+                    id: 'earthquakes-layer',
+                    type: 'circle',
+                    source: 'earthquakes',
+                    paint: {
+                        'circle-radius': 8,
+                        'circle-color': 'red',
+                        'circle-stroke-color': 'white',
+                        'circle-stroke-width': 2
+                    }
+                });
+
+                map.addSource('China', { type: 'geojson', data: China });
+                map.addLayer({
+                    id: 'China-layer',
+                    type: 'fill',
+                    source: 'China',
+                    paint: {
+                        'fill-color': '#0080ff',
+                        'fill-opacity': 0.5
+                    }
+                });
+            });
+        }
+
+        geojsonFetch().catch(e => console.log('Fetch error: ' + e.message));
+
+
+        function sortTable() {
+            const table = document.querySelector("table");
+            let switching = true;
+            while (switching) {
+                switching = false;
+                const rows = table.rows;
+                for (let i = 1; i < rows.length - 1; i++) {
+                    let x = parseFloat(rows[i].cells[1].textContent);
+                    let y = parseFloat(rows[i+1].cells[1].textContent);
+                    if (x < y) {
+                        rows[i].parentNode.insertBefore(rows[i+1], rows[i]);
+                        switching = true;
+                        break;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
